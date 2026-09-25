@@ -4,30 +4,30 @@ Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-WallpaperSwitcher is a small macOS SwiftUI menu bar app built for personal use. It has no Dock icon and runs as a status item utility. The main behavior is to keep separate light and dark wallpaper pools, apply the next wallpaper for the current macOS appearance, and optionally rotate wallpapers on a schedule.
+DuoScape is a small macOS SwiftUI menu bar app built for personal use. It has no Dock icon and runs as a status item utility. The main behavior is to keep separate light and dark wallpaper pools, apply the next wallpaper for the current macOS appearance, and optionally rotate wallpapers on a schedule.
 
 ## Code Layout
 
-- `WallpaperSwitcher/WallpaperSwitcherApp.swift`
+- `DuoScape/DuoScapeApp.swift`
   - SwiftUI `@main` entry point.
   - Contains `AppDelegate`.
   - Creates `MenuBarController`.
   - Uses `AppearanceMonitor.shared`.
   - Applies the correct wallpaper on app launch.
-- `WallpaperSwitcher/MenuBarController.swift`
+- `DuoScape/MenuBarController.swift`
   - Owns the `NSStatusItem` and menu actions.
   - Opens `SettingsView` in an `NSWindow` using `NSHostingController`.
   - The `Set wallpaper now` item should call `WallpaperCoordinator.shared.applyWallpaper(isDark:)`.
-- `WallpaperSwitcher/SettingsView.swift`
+- `DuoScape/SettingsView.swift`
   - SwiftUI settings UI.
   - Edits light and dark wallpaper URL arrays through `WallpaperCoordinator.shared`.
   - Contains rotation interval controls.
   - Uses `ServiceManagement` for launch-at-login.
-- `WallpaperSwitcher/AppearanceMonitor.swift`
+- `DuoScape/AppearanceMonitor.swift`
   - Singleton-style appearance monitor via `AppearanceMonitor.shared`.
   - Observes `AppleInterfaceThemeChangedNotification`.
   - Publishes `isDarkMode`.
-- `WallpaperSwitcher/WallpaperCoordinator.swift`
+- `DuoScape/WallpaperCoordinator.swift`
   - Singleton via `WallpaperCoordinator.shared`.
   - Stores wallpaper URL arrays, rotation settings, and wallpaper indices.
   - Persists state in `UserDefaults`.
@@ -39,7 +39,7 @@ WallpaperSwitcher is a small macOS SwiftUI menu bar app built for personal use. 
 Use this command for verification:
 
 ```sh
-xcodebuild -project WallpaperSwitcher.xcodeproj -scheme WallpaperSwitcher -configuration Debug -derivedDataPath ./.derivedData build
+xcodebuild -project DuoScape.xcodeproj -scheme DuoScape -configuration Debug -derivedDataPath ./.derivedData build
 ```
 
 After running the build, remove `.derivedData` unless the user asks to keep it:
@@ -59,7 +59,7 @@ The build may emit CoreSimulator warnings in sandboxed environments. Treat them 
   - Menu bar actions belong in `MenuBarController`.
 - Keep `SettingsView` focused on UI and write changes through `WallpaperCoordinator.shared`.
 - Use `UserDefaults` for simple persisted app settings unless there is a clear reason to introduce another store.
-- Do not edit `project.pbxproj` unless Xcode target membership or build settings require it. The project currently picks up Swift files placed under `WallpaperSwitcher/`.
+- Do not edit `project.pbxproj` unless Xcode target membership or build settings require it. The project currently picks up Swift files placed under `DuoScape/`.
 - Avoid broad refactors. This is a small personal utility, so prefer straightforward code over abstractions that are not needed yet.
 
 ## macOS-Specific Notes

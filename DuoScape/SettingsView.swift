@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  WallpaperSwitcher
+//  DuoScape
 //
 //  Created by Bora on 11.04.2026.
 //

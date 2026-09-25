@@ -1,14 +1,14 @@
-# WallpaperSwitcher
+# DuoScape
 
-WallpaperSwitcher is a small macOS menu bar app I built for my own personal need: keeping separate light and dark mode wallpaper pools and switching between them without opening System Settings.
+DuoScape is a small macOS menu bar app I built for my own personal need: keeping separate light and dark mode wallpaper pools and switching between them without opening System Settings.
 
 The app runs as an agent-style menu bar utility with no Dock icon. It watches for macOS appearance changes, applies the next wallpaper from the matching pool, and can rotate wallpapers on a schedule.
 
 ## Showcase
 
-![WallpaperSwitcher switching wallpapers from the menu bar](showcase.gif)
+![DuoScape switching wallpapers from the menu bar](showcase.gif)
 
-![WallpaperSwitcher settings and menu bar preview](showcase.avif)
+![DuoScape settings and menu bar preview](showcase.avif)
 
 ## Features
 
@@ -30,7 +30,7 @@ The app runs as an agent-style menu bar utility with no Dock icon. It watches fo
 
 ## Project Structure
 
-- `WallpaperSwitcherApp.swift` contains the SwiftUI app entry point and `AppDelegate`.
+- `DuoScapeApp.swift` contains the SwiftUI app entry point and `AppDelegate`.
 - `MenuBarController.swift` owns the menu bar status item and menu actions.
 - `SettingsView.swift` contains the SwiftUI settings UI.
 - `AppearanceMonitor.swift` observes macOS appearance changes and exposes the current dark/light state.
@@ -38,12 +38,12 @@ The app runs as an agent-style menu bar utility with no Dock icon. It watches fo
 
 ## Building
 
-Open `WallpaperSwitcher.xcodeproj` in Xcode and run the `WallpaperSwitcher` scheme.
+Open `DuoScape.xcodeproj` in Xcode and run the `DuoScape` scheme.
 
 You can also build from the command line:
 
 ```sh
-xcodebuild -project WallpaperSwitcher.xcodeproj -scheme WallpaperSwitcher -configuration Debug build
+xcodebuild -project DuoScape.xcodeproj -scheme DuoScape -configuration Debug build
 ```
 
 ## Notes
