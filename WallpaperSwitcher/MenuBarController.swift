@@ -23,7 +23,7 @@ final class MenuBarController: NSObject {
         if let button = statusItem.button {
             let image = NSImage(
                 systemSymbolName: "photo.on.rectangle",
-                accessibilityDescription: "Wallpaper Switcher"
+                accessibilityDescription: "DuoScape"
             )
             image?.isTemplate = true
 
