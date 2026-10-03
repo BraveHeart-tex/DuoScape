@@ -11,89 +11,81 @@ struct WallpaperLibraryView: View {
     @ObservedObject private var wallpaperCoordinator = WallpaperCoordinator.shared
 
     var body: some View {
-        VStack(spacing: 18) {
-            WallpaperSectionView(
-                title: "Light mode wallpapers",
-                wallpapers: $wallpaperCoordinator.lightWallpapers
-            )
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                WallpaperCollectionSection(
+                    title: "Light mode wallpapers",
+                    subtitle: "Used while your Mac is in Light Appearance",
+                    wallpapers: $wallpaperCoordinator.lightWallpapers,
+                    currentWallpaper: wallpaperCoordinator.currentLightWallpaper,
+                    onSelect: { wallpaperCoordinator.selectWallpaper($0, isDark: false) }
+                )
 
-            Divider()
+                Divider()
 
-            WallpaperSectionView(
-                title: "Dark mode wallpapers",
-                wallpapers: $wallpaperCoordinator.darkWallpapers
-            )
+                WallpaperCollectionSection(
+                    title: "Dark mode wallpapers",
+                    subtitle: "Used while your Mac is in Dark Appearance",
+                    wallpapers: $wallpaperCoordinator.darkWallpapers,
+                    currentWallpaper: wallpaperCoordinator.currentDarkWallpaper,
+                    onSelect: { wallpaperCoordinator.selectWallpaper($0, isDark: true) }
+                )
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(24)
         .frame(minWidth: 640, minHeight: 660)
     }
 }
 
-private struct WallpaperSectionView: View {
+private struct WallpaperCollectionSection: View {
     let title: String
+    let subtitle: String
     @Binding var wallpapers: [URL]
-
-    @State private var selectedWallpapers: Set<URL> = []
+    let currentWallpaper: URL?
+    let onSelect: (URL) -> Void
 
     private let columns = [
-        GridItem(.adaptive(minimum: 160), spacing: 12)
+        GridItem(.adaptive(minimum: 200), spacing: 16)
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text(title)
-                    .font(.headline)
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.title3.weight(.semibold))
 
-                Spacer()
-
-                Text("\(wallpapers.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(wallpapers, id: \.self) { wallpaper in
-                        WallpaperCardView(
-                            url: wallpaper,
-                            isSelected: selectedWallpapers.contains(wallpaper)
-                        )
-                        .onTapGesture {
-                            toggleSelection(for: wallpaper)
-                        }
-                    }
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 2)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    removeSelectedWallpaper()
+                } label: {
+                    Label("Remove selected", systemImage: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .disabled(currentWallpaper == nil)
+                .help("Remove the selected wallpaper from this collection")
             }
-            .overlay {
-                if wallpapers.isEmpty {
-                    ContentUnavailableView(
-                        "No images selected",
-                        systemImage: "photo.on.rectangle",
-                        description: Text("Add jpg, png, or heic files.")
+
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+                ForEach(wallpapers, id: \.self) { wallpaper in
+                    WallpaperThumbnailCard(
+                        url: wallpaper,
+                        isCurrent: wallpaper == currentWallpaper,
+                        action: { onSelect(wallpaper) }
                     )
                 }
-            }
 
-            HStack(spacing: 10) {
-                Button("Add images...") {
-                    addImages()
-                }
-
-                Button("Remove selected") {
-                    removeSelected()
-                }
-                .disabled(selectedWallpapers.isEmpty)
+                AddImagesTile(isEmpty: wallpapers.isEmpty, action: addImages)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onChange(of: wallpapers) { _, newValue in
-            selectedWallpapers = selectedWallpapers.intersection(Set(newValue))
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func addImages() {
@@ -109,81 +101,115 @@ private struct WallpaperSectionView: View {
 
         let existingWallpapers = Set(wallpapers)
         let newWallpapers = panel.urls.filter { !existingWallpapers.contains($0) }
-
-        guard !newWallpapers.isEmpty else {
-            return
-        }
-
         wallpapers.append(contentsOf: newWallpapers)
     }
 
-    private func removeSelected() {
-        wallpapers.removeAll { selectedWallpapers.contains($0) }
-        selectedWallpapers.removeAll()
-    }
-
-    private func toggleSelection(for wallpaper: URL) {
-        if selectedWallpapers.contains(wallpaper) {
-            selectedWallpapers.remove(wallpaper)
-        } else {
-            selectedWallpapers.insert(wallpaper)
+    private func removeSelectedWallpaper() {
+        guard let currentWallpaper else {
+            return
         }
+
+        wallpapers.removeAll { $0 == currentWallpaper }
     }
 }
 
-private struct WallpaperCardView: View {
+private struct WallpaperThumbnailCard: View {
     let url: URL
-    let isSelected: Bool
+    let isCurrent: Bool
+    let action: () -> Void
+
+    private let cornerRadius: CGFloat = 11
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            thumbnail
-                .overlay(alignment: .topTrailing) {
-                    if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(5)
-                            .background(Color.blue)
-                            .clipShape(Circle())
-                            .padding(6)
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 7) {
+                thumbnail
+                    .overlay(alignment: .topTrailing) {
+                        if isCurrent {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 24, height: 24)
+                                .background(Color.accentColor, in: Circle())
+                                .padding(8)
+                        }
                     }
-                }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .strokeBorder(
+                                isCurrent ? Color.accentColor : Color.clear,
+                                lineWidth: 2
+                            )
+                    }
 
-            Text(url.deletingPathExtension().lastPathComponent)
-                .font(.system(size: 11))
-                .foregroundStyle(Color.gray)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 6)
-                .padding(.bottom, 6)
+                Text(url.deletingPathExtension().lastPathComponent)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .contentShape(Rectangle())
         }
-        .frame(width: 160, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(isSelected ? Color.blue : Color.secondary.opacity(0.18), lineWidth: isSelected ? 2 : 1)
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .buttonStyle(.plain)
+        .help(url.lastPathComponent)
+        .accessibilityLabel("\(url.lastPathComponent)\(isCurrent ? ", selected wallpaper" : "")")
     }
 
-    @ViewBuilder private var thumbnail: some View {
-        if let image = NSImage(contentsOf: url) {
-            Image(nsImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 160, height: 90)
-                .clipped()
-        } else {
-            Rectangle()
-                .fill(Color.secondary.opacity(0.12))
-                .frame(width: 160, height: 90)
-                .overlay {
-                    Image(systemName: "photo")
-                        .font(.title3)
+    private var thumbnail: some View {
+        GeometryReader { geometry in
+            Group {
+                if let image = NSImage(contentsOf: url) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Rectangle()
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .overlay {
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundStyle(.tertiary)
+                        }
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
+        }
+        .aspectRatio(1.6, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+}
+
+private struct AddImagesTile: View {
+    let isEmpty: Bool
+    let action: () -> Void
+
+    private let cornerRadius: CGFloat = 11
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                if isEmpty {
+                    Text("No wallpapers yet")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+
+                Label("Add images", systemImage: "plus")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1.6, contentMode: .fit)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.secondary.opacity(0.22), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add images")
     }
 }
