@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import Combine
 import SQLite3
 
 enum WallpaperRotationInterval: String, CaseIterable, Identifiable {
@@ -45,30 +46,36 @@ enum WallpaperRotationInterval: String, CaseIterable, Identifiable {
     }
 }
 
-final class WallpaperCoordinator {
+final class WallpaperCoordinator: ObservableObject {
     static let shared = WallpaperCoordinator()
 
-    var lightWallpapers: [URL] {
+    @Published var lightWallpapers: [URL] {
         didSet {
-            lightWallpaperIndex = normalizedIndex(lightWallpaperIndex, count: lightWallpapers.count)
+            normalizeCurrentWallpaper(isDark: false)
             persistState()
         }
     }
 
-    var darkWallpapers: [URL] {
+    @Published var darkWallpapers: [URL] {
         didSet {
-            darkWallpaperIndex = normalizedIndex(darkWallpaperIndex, count: darkWallpapers.count)
+            normalizeCurrentWallpaper(isDark: true)
             persistState()
         }
     }
 
-    private(set) var lightWallpaperIndex: Int {
+    @Published private(set) var currentLightWallpaper: URL? {
         didSet {
             persistState()
         }
     }
 
-    private(set) var darkWallpaperIndex: Int {
+    @Published private(set) var currentDarkWallpaper: URL? {
+        didSet {
+            persistState()
+        }
+    }
+
+    @Published var changeWallpaperWhenAppearanceChanges: Bool {
         didSet {
             persistState()
         }
@@ -97,10 +104,14 @@ final class WallpaperCoordinator {
     private enum DefaultsKey {
         static let lightWallpapers = "WallpaperCoordinator.lightWallpapers"
         static let darkWallpapers = "WallpaperCoordinator.darkWallpapers"
+        // These index keys were written by earlier versions as the next wallpaper cursor.
         static let lightWallpaperIndex = "WallpaperCoordinator.lightWallpaperIndex"
         static let darkWallpaperIndex = "WallpaperCoordinator.darkWallpaperIndex"
+        static let currentLightWallpaper = "WallpaperCoordinator.currentLightWallpaper"
+        static let currentDarkWallpaper = "WallpaperCoordinator.currentDarkWallpaper"
         static let rotateWallpaper = "WallpaperCoordinator.rotateWallpaper"
         static let rotationInterval = "WallpaperCoordinator.rotationInterval"
+        static let changeWallpaperWhenAppearanceChanges = "WallpaperCoordinator.changeWallpaperWhenAppearanceChanges"
     }
 
     private init(defaults: UserDefaults = .standard) {
@@ -110,14 +121,26 @@ final class WallpaperCoordinator {
 
         lightWallpapers = Self.loadURLs(forKey: DefaultsKey.lightWallpapers, from: defaults)
         darkWallpapers = Self.loadURLs(forKey: DefaultsKey.darkWallpapers, from: defaults)
-        lightWallpaperIndex = defaults.integer(forKey: DefaultsKey.lightWallpaperIndex)
-        darkWallpaperIndex = defaults.integer(forKey: DefaultsKey.darkWallpaperIndex)
+        currentLightWallpaper = Self.loadCurrentWallpaper(
+            forKey: DefaultsKey.currentLightWallpaper,
+            legacyIndexKey: DefaultsKey.lightWallpaperIndex,
+            wallpapers: lightWallpapers,
+            defaults: defaults
+        )
+        currentDarkWallpaper = Self.loadCurrentWallpaper(
+            forKey: DefaultsKey.currentDarkWallpaper,
+            legacyIndexKey: DefaultsKey.darkWallpaperIndex,
+            wallpapers: darkWallpapers,
+            defaults: defaults
+        )
         rotateWallpaper = defaults.bool(forKey: DefaultsKey.rotateWallpaper)
         rotationInterval = defaults.string(forKey: DefaultsKey.rotationInterval)
             .flatMap(WallpaperRotationInterval.init(rawValue:)) ?? .onLoginOnly
+        changeWallpaperWhenAppearanceChanges = defaults.object(
+            forKey: DefaultsKey.changeWallpaperWhenAppearanceChanges
+        ) as? Bool ?? true
 
-        lightWallpaperIndex = normalizedIndex(lightWallpaperIndex, count: lightWallpapers.count)
-        darkWallpaperIndex = normalizedIndex(darkWallpaperIndex, count: darkWallpapers.count)
+        persistState()
         configureRotationTimer()
         configureScreenParametersObserver()
     }
@@ -132,7 +155,7 @@ final class WallpaperCoordinator {
     }
 
     func applyWallpaper(isDark: Bool) {
-        guard let wallpaperURL = nextWallpaperURL(isDark: isDark) else {
+        guard let wallpaperURL = currentWallpaper(isDark: isDark) else {
             return
         }
 
@@ -151,33 +174,59 @@ final class WallpaperCoordinator {
         applyWallpaperToAllSpaces(wallpaperURL)
     }
 
-    private func nextWallpaperURL(isDark: Bool) -> URL? {
+    func currentWallpaper(isDark: Bool) -> URL? {
+        isDark ? currentDarkWallpaper : currentLightWallpaper
+    }
+
+    func selectWallpaper(_ wallpaperURL: URL, isDark: Bool) {
+        let wallpapers = isDark ? darkWallpapers : lightWallpapers
+        guard wallpapers.contains(wallpaperURL) else {
+            return
+        }
+
         if isDark {
-            guard !darkWallpapers.isEmpty else {
-                return nil
-            }
+            currentDarkWallpaper = wallpaperURL
+        } else {
+            currentLightWallpaper = wallpaperURL
+        }
+    }
 
-            let wallpaperURL = darkWallpapers[darkWallpaperIndex]
-            darkWallpaperIndex = (darkWallpaperIndex + 1) % darkWallpapers.count
-            return wallpaperURL
+    func advanceAndApplyWallpaper(isDark: Bool) {
+        let wallpapers = isDark ? darkWallpapers : lightWallpapers
+        guard !wallpapers.isEmpty else {
+            return
         }
 
-        guard !lightWallpapers.isEmpty else {
-            return nil
-        }
+        let current = currentWallpaper(isDark: isDark)
+        let currentIndex = current.flatMap { wallpapers.firstIndex(of: $0) } ?? -1
+        let nextIndex = (currentIndex + 1) % wallpapers.count
+        selectWallpaper(wallpapers[nextIndex], isDark: isDark)
+        applyWallpaper(isDark: isDark)
+    }
 
-        let wallpaperURL = lightWallpapers[lightWallpaperIndex]
-        lightWallpaperIndex = (lightWallpaperIndex + 1) % lightWallpapers.count
-        return wallpaperURL
+    private func normalizeCurrentWallpaper(isDark: Bool) {
+        let wallpapers = isDark ? darkWallpapers : lightWallpapers
+        let current = currentWallpaper(isDark: isDark)
+        let normalized = current.flatMap { wallpapers.contains($0) ? $0 : nil } ?? wallpapers.first
+
+        if isDark {
+            currentDarkWallpaper = normalized
+        } else {
+            currentLightWallpaper = normalized
+        }
     }
 
     private func persistState() {
         defaults.set(lightWallpapers.map(\.absoluteString), forKey: DefaultsKey.lightWallpapers)
         defaults.set(darkWallpapers.map(\.absoluteString), forKey: DefaultsKey.darkWallpapers)
-        defaults.set(lightWallpaperIndex, forKey: DefaultsKey.lightWallpaperIndex)
-        defaults.set(darkWallpaperIndex, forKey: DefaultsKey.darkWallpaperIndex)
+        defaults.set(currentLightWallpaper?.absoluteString, forKey: DefaultsKey.currentLightWallpaper)
+        defaults.set(currentDarkWallpaper?.absoluteString, forKey: DefaultsKey.currentDarkWallpaper)
         defaults.set(rotateWallpaper, forKey: DefaultsKey.rotateWallpaper)
         defaults.set(rotationInterval.rawValue, forKey: DefaultsKey.rotationInterval)
+        defaults.set(
+            changeWallpaperWhenAppearanceChanges,
+            forKey: DefaultsKey.changeWallpaperWhenAppearanceChanges
+        )
     }
 
     private func configureRotationTimer() {
@@ -189,7 +238,7 @@ final class WallpaperCoordinator {
         }
 
         rotationTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.applyWallpaper(isDark: Self.resolveIsDarkMode())
+            self?.advanceAndApplyWallpaper(isDark: Self.resolveIsDarkMode())
         }
     }
 
@@ -292,12 +341,33 @@ final class WallpaperCoordinator {
         defaults.stringArray(forKey: key)?.compactMap(URL.init(string:)) ?? []
     }
 
-    private func normalizedIndex(_ index: Int, count: Int) -> Int {
-        guard count > 0 else {
-            return 0
+    private static func loadCurrentWallpaper(
+        forKey key: String,
+        legacyIndexKey: String,
+        wallpapers: [URL],
+        defaults: UserDefaults
+    ) -> URL? {
+        if let savedURLString = defaults.string(forKey: key),
+           let savedURL = URL(string: savedURLString),
+           wallpapers.contains(savedURL) {
+            return savedURL
         }
 
-        return min(max(index, 0), count - 1)
+        guard !wallpapers.isEmpty else {
+            return nil
+        }
+
+        if defaults.object(forKey: key) != nil {
+            return wallpapers[0]
+        }
+
+        guard defaults.object(forKey: legacyIndexKey) != nil else {
+            return wallpapers[0]
+        }
+
+        let legacyNextIndex = min(max(defaults.integer(forKey: legacyIndexKey), 0), wallpapers.count - 1)
+        let previousIndex = (legacyNextIndex - 1 + wallpapers.count) % wallpapers.count
+        return wallpapers[previousIndex]
     }
 }
 
