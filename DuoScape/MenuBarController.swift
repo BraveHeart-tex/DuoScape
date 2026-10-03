@@ -11,6 +11,7 @@ import SwiftUI
 final class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
     private var settingsWindow: NSWindow?
+    private var wallpaperLibraryWindow: NSWindow?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -42,8 +43,13 @@ final class MenuBarController: NSObject {
             keyEquivalent: ""
         ))
         menu.addItem(NSMenuItem(
-            title: "Preferences...",
-            action: #selector(openPreferences),
+            title: "Wallpaper Library...",
+            action: #selector(openWallpaperLibrary),
+            keyEquivalent: ""
+        ))
+        menu.addItem(NSMenuItem(
+            title: "Settings...",
+            action: #selector(openSettings),
             keyEquivalent: ","
         ))
         menu.addItem(NSMenuItem(
@@ -61,23 +67,48 @@ final class MenuBarController: NSObject {
         WallpaperCoordinator.shared.applyWallpaper(isDark: AppearanceMonitor.shared.isDarkMode)
     }
 
-    @objc private func openPreferences() {
-        if let settingsWindow {
-            settingsWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-
-        let hostingController = NSHostingController(rootView: SettingsView())
-        let window = NSWindow(contentViewController: hostingController)
-        window.title = "Preferences"
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 760, height: 480))
-        window.minSize = NSSize(width: 600, height: 400)
-        window.isReleasedWhenClosed = false
-        window.center()
+    @objc private func openSettings() {
+        let window = settingsWindow ?? makeWindow(
+            rootView: SettingsView(),
+            title: "Settings",
+            size: NSSize(width: 520, height: 300),
+            minimumSize: NSSize(width: 460, height: 250)
+        )
 
         settingsWindow = window
+        show(window)
+    }
+
+    @objc private func openWallpaperLibrary() {
+        let window = wallpaperLibraryWindow ?? makeWindow(
+            rootView: WallpaperLibraryView(),
+            title: "Wallpaper Library",
+            size: NSSize(width: 760, height: 720),
+            minimumSize: NSSize(width: 640, height: 660)
+        )
+
+        wallpaperLibraryWindow = window
+        show(window)
+    }
+
+    private func makeWindow<Content: View>(
+        rootView: Content,
+        title: String,
+        size: NSSize,
+        minimumSize: NSSize
+    ) -> NSWindow {
+        let hostingController = NSHostingController(rootView: rootView)
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = title
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.setContentSize(size)
+        window.minSize = minimumSize
+        window.isReleasedWhenClosed = false
+        window.center()
+        return window
+    }
+
+    private func show(_ window: NSWindow) {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
