@@ -10,6 +10,7 @@ import SwiftUI
 
 final class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
+    private let popover = NSPopover()
     private var settingsWindow: NSWindow?
     private var wallpaperLibraryWindow: NSWindow?
 
@@ -31,43 +32,42 @@ final class MenuBarController: NSObject {
             button.image = image
         }
 
-        statusItem.menu = makeMenu()
+        guard let button = statusItem.button else {
+            return
+        }
+
+        button.target = self
+        button.action = #selector(togglePopover)
+
+        popover.behavior = .transient
+        popover.animates = true
+        popover.contentViewController = NSHostingController(
+            rootView: MenuBarPopoverView(
+                onOpenWallpaperLibrary: { [weak self] in self?.openWallpaperLibrary() },
+                onOpenSettings: { [weak self] in self?.openSettings() },
+                onQuit: { [weak self] in self?.quit() }
+            )
+        )
     }
 
-    private func makeMenu() -> NSMenu {
-        let menu = NSMenu()
+    @objc private func togglePopover() {
+        guard let button = statusItem.button else {
+            return
+        }
 
-        menu.addItem(NSMenuItem(
-            title: "Set wallpaper now",
-            action: #selector(setWallpaperNow),
-            keyEquivalent: ""
-        ))
-        menu.addItem(NSMenuItem(
-            title: "Wallpaper Library...",
-            action: #selector(openWallpaperLibrary),
-            keyEquivalent: ""
-        ))
-        menu.addItem(NSMenuItem(
-            title: "Settings...",
-            action: #selector(openSettings),
-            keyEquivalent: ","
-        ))
-        menu.addItem(NSMenuItem(
-            title: "Quit",
-            action: #selector(quit),
-            keyEquivalent: "q"
-        ))
-
-        menu.items.forEach { $0.target = self }
-
-        return menu
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            popover.show(
+                relativeTo: button.bounds,
+                of: button,
+                preferredEdge: .minY
+            )
+        }
     }
 
-    @objc private func setWallpaperNow() {
-        WallpaperCoordinator.shared.applyWallpaper(isDark: AppearanceMonitor.shared.isDarkMode)
-    }
-
-    @objc private func openSettings() {
+    private func openSettings() {
+        popover.performClose(nil)
         let window = settingsWindow ?? makeWindow(
             rootView: SettingsView(),
             title: "Settings",
@@ -79,7 +79,8 @@ final class MenuBarController: NSObject {
         show(window)
     }
 
-    @objc private func openWallpaperLibrary() {
+    private func openWallpaperLibrary() {
+        popover.performClose(nil)
         let window = wallpaperLibraryWindow ?? makeWindow(
             rootView: WallpaperLibraryView(),
             title: "Wallpaper Library",
@@ -113,7 +114,8 @@ final class MenuBarController: NSObject {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc private func quit() {
+    private func quit() {
+        popover.performClose(nil)
         NSApplication.shared.terminate(nil)
     }
 }
