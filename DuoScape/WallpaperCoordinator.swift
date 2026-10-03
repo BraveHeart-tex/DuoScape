@@ -119,18 +119,20 @@ final class WallpaperCoordinator: ObservableObject {
         dockDesktopPictureDatabaseURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Dock/desktoppicture.db")
 
-        lightWallpapers = Self.loadURLs(forKey: DefaultsKey.lightWallpapers, from: defaults)
-        darkWallpapers = Self.loadURLs(forKey: DefaultsKey.darkWallpapers, from: defaults)
+        let initialLightWallpapers = Self.loadURLs(forKey: DefaultsKey.lightWallpapers, from: defaults)
+        let initialDarkWallpapers = Self.loadURLs(forKey: DefaultsKey.darkWallpapers, from: defaults)
+        lightWallpapers = initialLightWallpapers
+        darkWallpapers = initialDarkWallpapers
         currentLightWallpaper = Self.loadCurrentWallpaper(
             forKey: DefaultsKey.currentLightWallpaper,
             legacyIndexKey: DefaultsKey.lightWallpaperIndex,
-            wallpapers: lightWallpapers,
+            wallpapers: initialLightWallpapers,
             defaults: defaults
         )
         currentDarkWallpaper = Self.loadCurrentWallpaper(
             forKey: DefaultsKey.currentDarkWallpaper,
             legacyIndexKey: DefaultsKey.darkWallpaperIndex,
-            wallpapers: darkWallpapers,
+            wallpapers: initialDarkWallpapers,
             defaults: defaults
         )
         rotateWallpaper = defaults.bool(forKey: DefaultsKey.rotateWallpaper)
