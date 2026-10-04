@@ -4,35 +4,28 @@ Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-DuoScape is a small macOS SwiftUI menu bar app built for personal use. It has no Dock icon and runs as a status item utility. The main behavior is to keep separate light and dark wallpaper pools, apply the next wallpaper for the current macOS appearance, and optionally rotate wallpapers on a schedule.
+DuoScape is a small macOS SwiftUI and AppKit menu bar utility with no Dock icon. It has three surfaces: a menu bar popover, a Wallpaper Library window, and a Settings window. It keeps separate wallpaper collections and selections for Light and Dark Appearance.
+
+**Apply Now** applies the current selection without advancing. **Next Wallpaper** and scheduled rotation advance the active collection and apply the new selection. When enabled, appearance changes apply the selection for the matching appearance. Launch and display-configuration refreshes reapply the current selection without advancing.
 
 ## Code Layout
 
 - `DuoScape/DuoScapeApp.swift`
-  - SwiftUI `@main` entry point.
-  - Contains `AppDelegate`.
-  - Creates `MenuBarController`.
-  - Uses `AppearanceMonitor.shared`.
-  - Applies the correct wallpaper on app launch.
+  - SwiftUI `@main` entry point and `AppDelegate`.
+  - Creates `MenuBarController`, observes appearance changes, and applies the current selection on launch.
 - `DuoScape/MenuBarController.swift`
-  - Owns the `NSStatusItem` and menu actions.
-  - Opens `SettingsView` in an `NSWindow` using `NSHostingController`.
-  - The `Set wallpaper now` item should call `WallpaperCoordinator.shared.applyWallpaper(isDark:)`.
+  - Owns the `NSStatusItem`, popover, and reopenable Wallpaper Library and Settings windows.
+- `DuoScape/MenuBarPopoverView.swift`
+  - Shows the active appearance and wallpaper, and provides immediate wallpaper actions and navigation to the other surfaces.
+- `DuoScape/WallpaperLibraryView.swift`
+  - Manages the Light and Dark wallpaper collections and their selections.
 - `DuoScape/SettingsView.swift`
-  - SwiftUI settings UI.
-  - Edits light and dark wallpaper URL arrays through `WallpaperCoordinator.shared`.
-  - Contains rotation interval controls.
-  - Uses `ServiceManagement` for launch-at-login.
+  - Edits rotation, appearance-change, and launch-at-login settings.
 - `DuoScape/AppearanceMonitor.swift`
-  - Singleton-style appearance monitor via `AppearanceMonitor.shared`.
-  - Observes `AppleInterfaceThemeChangedNotification`.
-  - Publishes `isDarkMode`.
+  - Observes macOS appearance changes and publishes the current Light or Dark state.
 - `DuoScape/WallpaperCoordinator.swift`
-  - Singleton via `WallpaperCoordinator.shared`.
-  - Stores wallpaper URL arrays, rotation settings, and wallpaper indices.
-  - Persists state in `UserDefaults`.
-  - Applies wallpapers to all screens with `NSWorkspace`.
-  - Attempts all-Spaces support by updating the Dock `desktoppicture.db` SQLite database and restarting Dock.
+  - Owns wallpaper collections and selections, rotation settings and timer, persistence, and wallpaper application.
+  - Applies wallpapers to detected screens and attempts all-Spaces support through the Dock desktop picture database.
 
 ## Build Command
 
@@ -52,12 +45,12 @@ The build may emit CoreSimulator warnings in sandboxed environments. Treat them 
 
 ## Project Conventions
 
-- Prefer AppKit APIs where the app interacts with menu bar, windows, wallpapers, or macOS system services.
+- Prefer AppKit APIs where the app interacts with the menu bar, windows, wallpapers, or macOS system services.
 - Keep state ownership in existing singletons:
   - Appearance state belongs in `AppearanceMonitor`.
-  - Wallpaper lists, indices, rotation interval, and timer behavior belong in `WallpaperCoordinator`.
-  - Menu bar actions belong in `MenuBarController`.
-- Keep `SettingsView` focused on UI and write changes through `WallpaperCoordinator.shared`.
+  - Wallpaper collections, selections, indices, rotation interval, and timer behavior belong in `WallpaperCoordinator`.
+  - Status-item and window actions belong in `MenuBarController`; popover wallpaper actions call `WallpaperCoordinator`.
+- Keep `WallpaperLibraryView` focused on collection management and `SettingsView` focused on infrequent configuration. Write shared state through `WallpaperCoordinator.shared`.
 - Use `UserDefaults` for simple persisted app settings unless there is a clear reason to introduce another store.
 - Do not edit `project.pbxproj` unless Xcode target membership or build settings require it. The project currently picks up Swift files placed under `DuoScape/`.
 - Avoid broad refactors. This is a small personal utility, so prefer straightforward code over abstractions that are not needed yet.
@@ -68,7 +61,7 @@ The build may emit CoreSimulator warnings in sandboxed environments. Treat them 
 - The menu bar icon uses the SF Symbol `photo.on.rectangle`.
 - `ServiceManagement` login item changes should use `SMAppService.mainApp.register()` and `SMAppService.mainApp.unregister()`.
 - All-Spaces wallpaper support touches `~/Library/Application Support/Dock/desktoppicture.db` and runs `killall Dock`. This depends on macOS internals and may break on future macOS versions.
-- `NSWorkspace.shared.setDesktopImageURL(_:for:options:)` only affects detected screens/current behavior; keep the Dock database code separate and error-tolerant.
+- `NSWorkspace.shared.setDesktopImageURL(_:for:options:)` applies wallpaper to detected screens; keep the Dock database code separate and error-tolerant.
 
 ## Safety
 
