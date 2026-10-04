@@ -217,7 +217,7 @@ final class WallpaperCoordinator: ObservableObject {
 
     func advanceAndApplyWallpaper(isDark: Bool) {
         let wallpapers = (isDark ? darkWallpapers : lightWallpapers)
-            .filter(Self.isAvailableWallpaper)
+            .filter { Self.isAvailableWallpaper($0) }
         guard !wallpapers.isEmpty else {
             normalizeCurrentWallpaper(isDark: isDark)
             return
@@ -246,7 +246,7 @@ final class WallpaperCoordinator: ObservableObject {
         let current = currentWallpaper(isDark: isDark)
         let normalized = current.flatMap {
             wallpapers.contains($0) && Self.isAvailableWallpaper($0) ? $0 : nil
-        } ?? wallpapers.first(where: Self.isAvailableWallpaper)
+        } ?? wallpapers.first { Self.isAvailableWallpaper($0) }
 
         if isDark {
             currentDarkWallpaper = normalized
