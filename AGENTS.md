@@ -6,7 +6,7 @@ Guidance for AI coding agents working in this repository.
 
 DuoScape is a small macOS SwiftUI and AppKit menu bar utility with no Dock icon. It has three surfaces: a menu bar popover, a Wallpaper Library window, and a Settings window. It keeps separate wallpaper collections and selections for Light and Dark Appearance.
 
-**Apply Now** applies the current selection without advancing. **Next Wallpaper** and scheduled rotation advance the active collection and apply the new selection. When enabled, appearance changes apply the selection for the matching appearance. Launch and display-configuration refreshes reapply the current selection without advancing.
+**Apply Now** applies the current selection without advancing. **Next Wallpaper** and scheduled rotation advance the active collection and apply the new selection. When enabled, appearance changes apply the selection for the matching appearance. On launch, enabled rotation with **On login only** advances and applies the next wallpaper for the current appearance; otherwise launch and display-configuration refreshes reapply the current selection without advancing.
 
 ## Code Layout
 

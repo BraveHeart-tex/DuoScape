@@ -189,6 +189,15 @@ final class WallpaperCoordinator: ObservableObject {
         applyWallpaperToAllSpaces(wallpaperURL)
     }
 
+    func applyWallpaperForLaunch(isDark: Bool) {
+        guard rotateWallpaper, rotationInterval == .onLoginOnly else {
+            applyWallpaper(isDark: isDark)
+            return
+        }
+
+        advanceAndApplyWallpaper(isDark: isDark)
+    }
+
     func currentWallpaper(isDark: Bool) -> URL? {
         isDark ? currentDarkWallpaper : currentLightWallpaper
     }

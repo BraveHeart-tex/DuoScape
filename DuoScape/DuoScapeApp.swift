@@ -48,6 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WallpaperCoordinator.shared.applyWallpaper(isDark: isDarkMode)
         }
 
-        WallpaperCoordinator.shared.applyWallpaper(isDark: AppearanceMonitor.shared.isDarkMode)
+        WallpaperCoordinator.shared.applyWallpaperForLaunch(
+            isDark: AppearanceMonitor.shared.isDarkMode
+        )
     }
 }

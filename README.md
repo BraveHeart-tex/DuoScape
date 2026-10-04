@@ -18,9 +18,10 @@ DuoScape is a macOS menu bar utility for keeping separate wallpaper collections 
 - **Next Wallpaper** advances the active collection and applies the new selection.
 - When timed rotation is enabled, each scheduled rotation advances the active collection and applies the new selection.
 - When enabled, an appearance change applies the selected wallpaper from the matching collection.
-- Launch and display-configuration refreshes reapply the current selection without advancing.
+- At launch, enabled rotation with **On login only** advances and applies the next wallpaper for the active appearance. Otherwise launch reapplies the current selection without advancing.
+- Display-configuration refreshes reapply the current selection without advancing.
 
-Wallpaper selections and rotation settings are stored in `UserDefaults`; launch at login uses `ServiceManagement`. Rotation intervals are 30 minutes, 1 hour, 3 hours, or **On login only**. The last option disables timed rotation; launching the app still applies the current selection.
+Wallpaper selections and rotation settings are stored in `UserDefaults`; launch at login uses `ServiceManagement`. Rotation intervals are 30 minutes, 1 hour, 3 hours, or **On login only**. The last option rotates on app launch when rotation is enabled.
 
 ## Build
 

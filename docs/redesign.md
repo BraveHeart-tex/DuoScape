@@ -175,6 +175,8 @@ When macOS changes between Light and Dark Appearance, apply the current wallpape
 
 When rotation occurs, advance to the next wallpaper in the active collection and apply it.
 
+When rotation is enabled with **On login only**, app launch advances to the next wallpaper for the current appearance and applies it. With rotation disabled or a timed interval selected, launch applies the current selection without advancing.
+
 ## Design inspiration
 
 The strongest reference mix is:
