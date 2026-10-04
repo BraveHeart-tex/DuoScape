@@ -12,7 +12,7 @@ struct WallpaperLibraryView: View {
     @ObservedObject private var wallpaperCoordinator = WallpaperCoordinator.shared
     @ObservedObject private var appearanceMonitor = AppearanceMonitor.shared
 
-    @State private var selectedWallpaper: WallpaperSelection?
+    @FocusState private var focusedWallpaper: WallpaperItem?
 
     var body: some View {
         ScrollView {
@@ -59,17 +59,13 @@ struct WallpaperLibraryView: View {
             subtitle: subtitle,
             wallpapers: wallpapers,
             currentWallpaper: currentWallpaper,
+            focusedWallpaper: $focusedWallpaper,
             isDark: isDark,
-            selectedWallpaper: selectedWallpaper,
             onSelect: { url in
                 guard WallpaperCoordinator.isAvailableWallpaper(url) else {
                     return
                 }
-                selectedWallpaper = WallpaperSelection(url: url, isDark: isDark)
                 wallpaperCoordinator.selectWallpaper(url, isDark: isDark)
-            },
-            onFocus: { url in
-                selectedWallpaper = WallpaperSelection(url: url, isDark: isDark)
             },
             onRemove: { url in
                 removeWallpaper(url, isDark: isDark)
@@ -81,7 +77,7 @@ struct WallpaperLibraryView: View {
     }
 
     private func addImagesForKeyboardTarget() {
-        addImages(isDark: selectedWallpaper?.isDark ?? appearanceMonitor.isDarkMode)
+        addImages(isDark: focusedWallpaper?.isDark ?? appearanceMonitor.isDarkMode)
     }
 
     private func addImages(isDark: Bool) {
@@ -118,11 +114,20 @@ struct WallpaperLibraryView: View {
     }
 
     private func removeSelectedWallpaper() {
-        guard let selectedWallpaper else {
+        let target = focusedWallpaper ?? currentWallpaperItem
+        guard let target else {
             return
         }
 
-        removeWallpaper(selectedWallpaper.url, isDark: selectedWallpaper.isDark)
+        removeWallpaper(target.url, isDark: target.isDark)
+    }
+
+    private var currentWallpaperItem: WallpaperItem? {
+        let isDark = appearanceMonitor.isDarkMode
+        guard let url = wallpaperCoordinator.currentWallpaper(isDark: isDark) else {
+            return nil
+        }
+        return WallpaperItem(url: url, isDark: isDark)
     }
 
     private func removeWallpaper(_ url: URL, isDark: Bool) {
@@ -132,8 +137,8 @@ struct WallpaperLibraryView: View {
             wallpaperCoordinator.lightWallpapers.removeAll { $0 == url }
         }
 
-        if selectedWallpaper == WallpaperSelection(url: url, isDark: isDark) {
-            selectedWallpaper = nil
+        if focusedWallpaper == WallpaperItem(url: url, isDark: isDark) {
+            focusedWallpaper = nil
         }
         if WallpaperQuickLookController.shared.previewedURL == url {
             WallpaperQuickLookController.shared.close()
@@ -186,7 +191,7 @@ private final class WallpaperQuickLookController: NSObject, QLPreviewPanelDataSo
     }
 }
 
-private struct WallpaperSelection: Equatable {
+private struct WallpaperItem: Hashable {
     let url: URL
     let isDark: Bool
 }
@@ -196,10 +201,9 @@ private struct WallpaperCollectionSection: View {
     let subtitle: String
     @Binding var wallpapers: [URL]
     let currentWallpaper: URL?
+    @FocusState.Binding var focusedWallpaper: WallpaperItem?
     let isDark: Bool
-    let selectedWallpaper: WallpaperSelection?
     let onSelect: (URL) -> Void
-    let onFocus: (URL) -> Void
     let onRemove: (URL) -> Void
     let onQuickLook: (URL) -> Void
     let onAddImages: () -> Void
@@ -224,12 +228,13 @@ private struct WallpaperCollectionSection: View {
 
             LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
                 ForEach(wallpapers, id: \.self) { wallpaper in
+                    let item = WallpaperItem(url: wallpaper, isDark: isDark)
                     WallpaperThumbnailCard(
                         url: wallpaper,
                         isCurrent: wallpaper == currentWallpaper,
-                        isSelected: selectedWallpaper == WallpaperSelection(url: wallpaper, isDark: isDark),
+                        item: item,
+                        focusedWallpaper: $focusedWallpaper,
                         onSelect: { onSelect(wallpaper) },
-                        onFocus: { onFocus(wallpaper) },
                         onReveal: { NSWorkspace.shared.activateFileViewerSelecting([wallpaper]) },
                         onRemove: { onRemove(wallpaper) },
                         onQuickLook: { onQuickLook(wallpaper) }
@@ -307,17 +312,20 @@ private struct WallpaperCollectionSection: View {
 private struct WallpaperThumbnailCard: View {
     let url: URL
     let isCurrent: Bool
-    let isSelected: Bool
+    let item: WallpaperItem
+    @FocusState.Binding var focusedWallpaper: WallpaperItem?
     let onSelect: () -> Void
-    let onFocus: () -> Void
     let onReveal: () -> Void
     let onRemove: () -> Void
     let onQuickLook: () -> Void
 
     @State private var isHovered = false
-    @FocusState private var isFocused: Bool
 
     private let cornerRadius: CGFloat = 11
+
+    private var isFocused: Bool {
+        focusedWallpaper == item
+    }
 
     private var isAvailable: Bool {
         WallpaperCoordinator.isAvailableWallpaper(url)
@@ -363,12 +371,7 @@ private struct WallpaperThumbnailCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .focused($isFocused)
-        .onChange(of: isFocused) { _, focused in
-            if focused && isAvailable {
-                onFocus()
-            }
-        }
+        .focused($focusedWallpaper, equals: item)
         .onHover { isHovered = $0 }
         .onKeyPress(.space) {
             if isAvailable {
@@ -384,28 +387,28 @@ private struct WallpaperThumbnailCard: View {
         }
         .help(url.lastPathComponent)
         .accessibilityLabel(
-            "\(url.lastPathComponent)\(isAvailable ? "" : ", unavailable")\(isSelected ? ", selected" : "")\(isCurrent ? ", current wallpaper" : "")"
+            "\(url.lastPathComponent)\(isAvailable ? "" : ", unavailable")\(isCurrent ? ", selected current wallpaper" : "")\(isFocused ? ", keyboard focused" : "")"
         )
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .animation(.easeOut(duration: 0.12), value: isFocused)
-        .animation(.easeOut(duration: 0.12), value: isSelected)
     }
 
     private var borderColor: Color {
-        if isSelected || isFocused {
-            return Color.accentColor
+        if isCurrent {
+            return Color.accentColor.opacity(0.72)
+        }
+        if isFocused {
+            return Color.accentColor.opacity(0.4)
         }
         if isHovered {
             return Color.secondary.opacity(0.45)
-        }
-        if isCurrent {
-            return Color.accentColor.opacity(0.72)
         }
         return .clear
     }
 
     private var borderWidth: CGFloat {
-        isSelected || isFocused || isCurrent ? 2 : 1
+        isFocused || isCurrent ? 2 : 1
     }
 
     private var thumbnail: some View {
