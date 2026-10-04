@@ -81,14 +81,14 @@ final class WallpaperCoordinator: ObservableObject {
         }
     }
 
-    var rotateWallpaper: Bool {
+    @Published var rotateWallpaper: Bool {
         didSet {
             persistState()
             configureRotationTimer()
         }
     }
 
-    var rotationInterval: WallpaperRotationInterval {
+    @Published var rotationInterval: WallpaperRotationInterval {
         didSet {
             persistState()
             configureRotationTimer()

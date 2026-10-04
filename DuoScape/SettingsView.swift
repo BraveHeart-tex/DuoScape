@@ -11,37 +11,38 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var wallpaperCoordinator = WallpaperCoordinator.shared
-    @State private var rotateWallpaper = false
-    @State private var rotationInterval: WallpaperRotationInterval = .onLoginOnly
     @State private var launchAtLogin = false
     @State private var launchAtLoginStatusText = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 16) {
-                Toggle("Rotate wallpapers", isOn: $rotateWallpaper)
+        VStack(alignment: .leading, spacing: 0) {
+            Toggle("Rotate wallpapers", isOn: $wallpaperCoordinator.rotateWallpaper)
 
-                HStack {
-                    Text("Change wallpaper")
+            HStack {
+                Text("Change wallpaper")
 
-                    Spacer()
+                Spacer()
 
-                    Picker("Rotation interval", selection: $rotationInterval) {
-                        ForEach(WallpaperRotationInterval.allCases) { interval in
-                            Text(interval.title).tag(interval)
-                        }
+                Picker("Rotation interval", selection: $wallpaperCoordinator.rotationInterval) {
+                    ForEach(WallpaperRotationInterval.allCases) { interval in
+                        Text(interval.title).tag(interval)
                     }
-                    .labelsHidden()
-                    .frame(width: 190)
                 }
-
-                Toggle(
-                    "Change wallpaper when system appearance changes",
-                    isOn: $wallpaperCoordinator.changeWallpaperWhenAppearanceChanges
-                )
+                .labelsHidden()
+                .frame(width: 190)
             }
+            .padding(.leading, 22)
+            .padding(.top, 8)
+            .disabled(!wallpaperCoordinator.rotateWallpaper)
+
+            Toggle(
+                "Change wallpaper when system appearance changes",
+                isOn: $wallpaperCoordinator.changeWallpaperWhenAppearanceChanges
+            )
+            .padding(.top, 18)
 
             Divider()
+                .padding(.vertical, 14)
 
             VStack(alignment: .leading, spacing: 6) {
                 Toggle("Launch at login", isOn: Binding(
@@ -51,27 +52,35 @@ struct SettingsView: View {
                     }
                 ))
 
-                Text(launchAtLoginStatusText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 22)
+                if !launchAtLoginStatusText.isEmpty {
+                    Text(launchAtLoginStatusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 22)
+                }
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 12)
+
+            if let versionDescription {
+                Text(versionDescription)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .padding(24)
+        .padding(20)
         .frame(minWidth: 460, minHeight: 250, alignment: .topLeading)
-        .onAppear {
-            rotateWallpaper = wallpaperCoordinator.rotateWallpaper
-            rotationInterval = wallpaperCoordinator.rotationInterval
-            refreshLaunchAtLoginStatus()
+        .onAppear(perform: refreshLaunchAtLoginStatus)
+    }
+
+    private var versionDescription: String? {
+        guard let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String else {
+            return nil
         }
-        .onChange(of: rotateWallpaper) { _, newValue in
-            wallpaperCoordinator.rotateWallpaper = newValue
-        }
-        .onChange(of: rotationInterval) { _, newValue in
-            wallpaperCoordinator.rotationInterval = newValue
-        }
+
+        return "Version \(shortVersion) (\(buildVersion))"
     }
 
     private func setLaunchAtLogin(_ isEnabled: Bool) {
@@ -83,6 +92,9 @@ struct SettingsView: View {
             }
         } catch {
             print("Failed to update launch at login: \(error.localizedDescription)")
+            refreshLaunchAtLoginStatus()
+            launchAtLoginStatusText = error.localizedDescription
+            return
         }
 
         refreshLaunchAtLoginStatus()
@@ -92,13 +104,13 @@ struct SettingsView: View {
         switch SMAppService.mainApp.status {
         case .enabled:
             launchAtLogin = true
-            launchAtLoginStatusText = "Enabled"
+            launchAtLoginStatusText = ""
         case .requiresApproval:
             launchAtLogin = true
             launchAtLoginStatusText = "Requires approval in System Settings"
         case .notRegistered:
             launchAtLogin = false
-            launchAtLoginStatusText = "Disabled"
+            launchAtLoginStatusText = ""
         case .notFound:
             launchAtLogin = false
             launchAtLoginStatusText = "Login item unavailable"

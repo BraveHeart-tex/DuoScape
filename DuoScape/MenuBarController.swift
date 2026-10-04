@@ -66,7 +66,7 @@ final class MenuBarController: NSObject {
         }
     }
 
-    private func openSettings() {
+    func openSettings() {
         popover.performClose(nil)
         let window = settingsWindow ?? makeWindow(
             rootView: SettingsView(),

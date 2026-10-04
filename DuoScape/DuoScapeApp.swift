@@ -15,12 +15,24 @@ struct DuoScapeApp: App {
         Settings {
             SettingsView()
         }
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    appDelegate.openSettings()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
     private var appearanceMonitor: AppearanceMonitor?
+
+    func openSettings() {
+        menuBarController?.openSettings()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBarController = MenuBarController()
