@@ -142,6 +142,8 @@ final class WallpaperCoordinator: ObservableObject {
             forKey: DefaultsKey.changeWallpaperWhenAppearanceChanges
         ) as? Bool ?? true
 
+        normalizeCurrentWallpaper(isDark: false)
+        normalizeCurrentWallpaper(isDark: true)
         persistState()
         configureRotationTimer()
         configureScreenParametersObserver()
@@ -157,11 +159,22 @@ final class WallpaperCoordinator: ObservableObject {
     }
 
     func applyWallpaper(isDark: Bool) {
+        normalizeCurrentWallpaper(isDark: isDark)
         guard let wallpaperURL = currentWallpaper(isDark: isDark) else {
             return
         }
 
+        guard Self.isAvailableWallpaper(wallpaperURL) else {
+            print("Skipping unavailable wallpaper: \(wallpaperURL.path)")
+            return
+        }
+
         for screen in NSScreen.screens {
+            guard Self.isAvailableWallpaper(wallpaperURL) else {
+                print("Skipping unavailable wallpaper: \(wallpaperURL.path)")
+                return
+            }
+
             do {
                 try NSWorkspace.shared.setDesktopImageURL(
                     wallpaperURL,
@@ -182,7 +195,7 @@ final class WallpaperCoordinator: ObservableObject {
 
     func selectWallpaper(_ wallpaperURL: URL, isDark: Bool) {
         let wallpapers = isDark ? darkWallpapers : lightWallpapers
-        guard wallpapers.contains(wallpaperURL) else {
+        guard wallpapers.contains(wallpaperURL), Self.isAvailableWallpaper(wallpaperURL) else {
             return
         }
 
@@ -194,8 +207,10 @@ final class WallpaperCoordinator: ObservableObject {
     }
 
     func advanceAndApplyWallpaper(isDark: Bool) {
-        let wallpapers = isDark ? darkWallpapers : lightWallpapers
+        let wallpapers = (isDark ? darkWallpapers : lightWallpapers)
+            .filter(Self.isAvailableWallpaper)
         guard !wallpapers.isEmpty else {
+            normalizeCurrentWallpaper(isDark: isDark)
             return
         }
 
@@ -206,10 +221,23 @@ final class WallpaperCoordinator: ObservableObject {
         applyWallpaper(isDark: isDark)
     }
 
+    static func isAvailableWallpaper(_ wallpaperURL: URL) -> Bool {
+        guard wallpaperURL.isFileURL,
+              FileManager.default.fileExists(atPath: wallpaperURL.path),
+              FileManager.default.isReadableFile(atPath: wallpaperURL.path),
+              NSImage(contentsOf: wallpaperURL) != nil else {
+            return false
+        }
+
+        return true
+    }
+
     private func normalizeCurrentWallpaper(isDark: Bool) {
         let wallpapers = isDark ? darkWallpapers : lightWallpapers
         let current = currentWallpaper(isDark: isDark)
-        let normalized = current.flatMap { wallpapers.contains($0) ? $0 : nil } ?? wallpapers.first
+        let normalized = current.flatMap {
+            wallpapers.contains($0) && Self.isAvailableWallpaper($0) ? $0 : nil
+        } ?? wallpapers.first(where: Self.isAvailableWallpaper)
 
         if isDark {
             currentDarkWallpaper = normalized
@@ -270,20 +298,25 @@ final class WallpaperCoordinator: ObservableObject {
     }
 
     private func applyWallpaperToAllSpaces(_ wallpaperURL: URL) {
+        guard Self.isAvailableWallpaper(wallpaperURL) else {
+            print("Skipping unavailable wallpaper for all Spaces: \(wallpaperURL.path)")
+            return
+        }
+
         guard FileManager.default.fileExists(atPath: dockDesktopPictureDatabaseURL.path) else {
             print("Dock desktop picture database not found at \(dockDesktopPictureDatabaseURL.path)")
             return
         }
 
         do {
-            try updateDockDesktopPictureDatabase(wallpaperPath: wallpaperURL.path)
+            try updateDockDesktopPictureDatabase(wallpaperURL: wallpaperURL)
             try reloadDock()
         } catch {
             print("Failed to apply wallpaper to all Spaces: \(error.localizedDescription)")
         }
     }
 
-    private func updateDockDesktopPictureDatabase(wallpaperPath: String) throws {
+    private func updateDockDesktopPictureDatabase(wallpaperURL: URL) throws {
         var database: OpaquePointer?
 
         guard sqlite3_open(dockDesktopPictureDatabaseURL.path, &database) == SQLITE_OK else {
@@ -309,8 +342,12 @@ final class WallpaperCoordinator: ObservableObject {
             sqlite3_finalize(statement)
         }
 
-        guard sqlite3_bind_text(statement, 1, wallpaperPath, -1, SQLITE_TRANSIENT) == SQLITE_OK else {
+        guard sqlite3_bind_text(statement, 1, wallpaperURL.path, -1, SQLITE_TRANSIENT) == SQLITE_OK else {
             throw WallpaperCoordinatorError.databaseUpdateFailed(sqlite3ErrorMessage(database))
+        }
+
+        guard Self.isAvailableWallpaper(wallpaperURL) else {
+            throw WallpaperCoordinatorError.wallpaperUnavailable(wallpaperURL.path)
         }
 
         guard sqlite3_step(statement) == SQLITE_DONE else {
@@ -377,6 +414,7 @@ private enum WallpaperCoordinatorError: LocalizedError {
     case databaseOpenFailed(String)
     case databaseUpdateFailed(String)
     case dockReloadFailed(Int32)
+    case wallpaperUnavailable(String)
 
     var errorDescription: String? {
         switch self {
@@ -386,6 +424,8 @@ private enum WallpaperCoordinatorError: LocalizedError {
             return "Could not update Dock desktop picture database: \(message)"
         case .dockReloadFailed(let status):
             return "Could not reload Dock. killall exited with status \(status)."
+        case .wallpaperUnavailable(let path):
+            return "Wallpaper is unavailable or unreadable: \(path)"
         }
     }
 }

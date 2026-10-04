@@ -62,6 +62,9 @@ struct WallpaperLibraryView: View {
             isDark: isDark,
             selectedWallpaper: selectedWallpaper,
             onSelect: { url in
+                guard WallpaperCoordinator.isAvailableWallpaper(url) else {
+                    return
+                }
                 selectedWallpaper = WallpaperSelection(url: url, isDark: isDark)
                 wallpaperCoordinator.selectWallpaper(url, isDark: isDark)
             },
@@ -140,8 +143,7 @@ struct WallpaperLibraryView: View {
     fileprivate static func isSupportedImage(_ url: URL) -> Bool {
         guard url.isFileURL,
               UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true,
-              FileManager.default.fileExists(atPath: url.path),
-              NSImage(contentsOf: url) != nil else {
+              WallpaperCoordinator.isAvailableWallpaper(url) else {
             return false
         }
 
@@ -155,7 +157,7 @@ private final class WallpaperQuickLookController: NSObject, QLPreviewPanelDataSo
     private(set) var previewedURL: URL?
 
     func show(_ url: URL) {
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        guard WallpaperCoordinator.isAvailableWallpaper(url) else {
             return
         }
 
@@ -318,7 +320,7 @@ private struct WallpaperThumbnailCard: View {
     private let cornerRadius: CGFloat = 11
 
     private var isAvailable: Bool {
-        FileManager.default.fileExists(atPath: url.path)
+        WallpaperCoordinator.isAvailableWallpaper(url)
     }
 
     var body: some View {
@@ -332,6 +334,17 @@ private struct WallpaperThumbnailCard: View {
                                 .foregroundStyle(.white)
                                 .frame(width: 24, height: 24)
                                 .background(Color.accentColor, in: Circle())
+                                .padding(8)
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if !isAvailable {
+                            Text("Unavailable")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(.ultraThinMaterial, in: Capsule())
                                 .padding(8)
                         }
                     }
@@ -352,7 +365,7 @@ private struct WallpaperThumbnailCard: View {
         .buttonStyle(.plain)
         .focused($isFocused)
         .onChange(of: isFocused) { _, focused in
-            if focused {
+            if focused && isAvailable {
                 onFocus()
             }
         }
@@ -371,7 +384,7 @@ private struct WallpaperThumbnailCard: View {
         }
         .help(url.lastPathComponent)
         .accessibilityLabel(
-            "\(url.lastPathComponent)\(isSelected ? ", selected" : "")\(isCurrent ? ", current wallpaper" : "")"
+            "\(url.lastPathComponent)\(isAvailable ? "" : ", unavailable")\(isSelected ? ", selected" : "")\(isCurrent ? ", current wallpaper" : "")"
         )
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .animation(.easeOut(duration: 0.12), value: isFocused)
