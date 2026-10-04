@@ -226,29 +226,43 @@ private struct WallpaperCollectionSection: View {
                     .foregroundStyle(.secondary)
             }
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
-                ForEach(wallpapers, id: \.self) { wallpaper in
-                    let item = WallpaperItem(url: wallpaper, isDark: isDark)
-                    WallpaperThumbnailCard(
-                        url: wallpaper,
-                        isCurrent: wallpaper == currentWallpaper,
-                        item: item,
-                        focusedWallpaper: $focusedWallpaper,
-                        onSelect: { onSelect(wallpaper) },
-                        onReveal: { NSWorkspace.shared.activateFileViewerSelecting([wallpaper]) },
-                        onRemove: { onRemove(wallpaper) },
-                        onQuickLook: { onQuickLook(wallpaper) }
+            Group {
+                if wallpapers.isEmpty {
+                    EmptyWallpaperState(
+                        appearance: isDark ? "Dark" : "Light",
+                        action: onAddImages
                     )
-                }
+                } else {
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+                        ForEach(wallpapers, id: \.self) { wallpaper in
+                            let item = WallpaperItem(url: wallpaper, isDark: isDark)
+                            WallpaperThumbnailCard(
+                                url: wallpaper,
+                                isCurrent: wallpaper == currentWallpaper,
+                                item: item,
+                                focusedWallpaper: $focusedWallpaper,
+                                onSelect: { onSelect(wallpaper) },
+                                onReveal: { NSWorkspace.shared.activateFileViewerSelecting([wallpaper]) },
+                                onRemove: { onRemove(wallpaper) },
+                                onQuickLook: { onQuickLook(wallpaper) }
+                            )
+                        }
 
-                AddImagesTile(isEmpty: wallpapers.isEmpty, action: onAddImages)
+                        AddImagesTile(action: onAddImages)
+                    }
+                }
             }
             .padding(5)
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(
-                        isDropTargeted ? Color.accentColor.opacity(0.65) : Color.clear,
-                        lineWidth: 2
+                        isDropTargeted
+                            ? Color.accentColor.opacity(0.7)
+                            : wallpapers.isEmpty ? Color.secondary.opacity(0.24) : Color.clear,
+                        style: StrokeStyle(
+                            lineWidth: isDropTargeted ? 2 : 1,
+                            dash: wallpapers.isEmpty && !isDropTargeted ? [5, 4] : []
+                        )
                     )
                     .padding(-5)
                     .allowsHitTesting(false)
@@ -436,8 +450,43 @@ private struct WallpaperThumbnailCard: View {
     }
 }
 
+private struct EmptyWallpaperState: View {
+    let appearance: String
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 23, weight: .regular))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 48, height: 48)
+                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("No wallpapers yet")
+                    .font(.headline)
+
+                Text("Add wallpapers for your Mac’s \(appearance) Appearance, or drag image files here.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            Button(action: action) {
+                Label("Add Images", systemImage: "plus")
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.45))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
 private struct AddImagesTile: View {
-    let isEmpty: Bool
     let action: () -> Void
 
     @State private var isHovered = false
@@ -447,28 +496,22 @@ private struct AddImagesTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                if isEmpty {
-                    Text("No wallpapers yet")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .aspectRatio(1.6, contentMode: .fit)
+                .overlay {
+                    Label("Add images", systemImage: "plus")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(Color.accentColor)
                 }
-
-                Label("Add images", systemImage: "plus")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(Color.accentColor)
-            }
-            .frame(maxWidth: .infinity)
-            .aspectRatio(1.6, contentMode: .fit)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(borderColor, lineWidth: isFocused ? 2 : 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(borderColor, lineWidth: isFocused ? 2 : 1)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
         .focused($isFocused)
         .onHover { isHovered = $0 }
         .accessibilityLabel("Add images")
